@@ -68,7 +68,7 @@ if enable_video == 1
     open(writerObj);   
 end
 
-%% Plot landscape and draw the leg with initial value
+%% Plot the landscape and the leg with initial value
 figure(1)
 set(gcf,'name','Leg rotaion simulation','Position', [100 100 1500 800]);
 
@@ -77,13 +77,17 @@ set(gcf,'name','Leg rotaion simulation','Position', [100 100 1500 800]);
 delta_theta_increment = pi/200;
 
 % First trial
-% To get the boundary for the further contacting calculation
-plot(landscape_table(1,:),landscape_table(2,:),'color','k' ,'linewidth', 2);
-hold on;
+% To get the leg_contour for the further contacting calculation
+leg_contour = def_leg_contour(hip_joint, delta_theta, delta_r);
+plot_legend = plot_landscape_leg(landscape_table,leg_contour);
+% plot(landscape_table(1,:),landscape_table(2,:),'color','k' ,'linewidth', 2);
+
 title_str = ['\Delta \theta = ',num2str(delta_theta*180/pi),' \circ',...
              ' , \Delta r = ',num2str(delta_r),' cm , ', landscape_str];
 title(title_str);
-boundary = draw_leg(hip_joint, delta_theta, delta_r);
+axis equal;
+axis([x_range y_range]); % acorrding to the given landscape
+
 hold off;
 
 %% Main loop start
@@ -93,7 +97,7 @@ while delta_theta <= delta_theta_end
     %% Check overlap and update the hip joint and contact point
     
     % Find normal force point
-    normal_force_point = find_normal_force_point(boundary,landscape_table);
+    normal_force_point = find_normal_force_point(leg_contour,landscape_table);
     
     if ~isempty(normal_force_point.point_1)
         
@@ -135,8 +139,7 @@ while delta_theta <= delta_theta_end
     
     if ~isempty(normal_force_point.point_2)
 
-        land_diff = lookup_table(landscape_table(1,:),landscape_table(3,:),normal_force_point.point_2(1));
-        
+        land_diff = lookup_table(landscape_table(1,:),landscape_table(3,:),normal_force_point.point_2(1));       
         % Visualize the position shifting by using arrow
         % according to the overlap
 
@@ -191,27 +194,26 @@ while delta_theta <= delta_theta_end
     
     
     %% Drawings 
-    % Draw the landscape
-    p_landscape = plot(landscape_table(1,:),landscape_table(2,:),'color','k' ,'linewidth', 2 );
-    hold on;
+
+    % Return the leg_contour
+    leg_contour = def_leg_contour(hip_joint, delta_theta, delta_r);
     
-    p_hip_joint = plot(hip_joint_record(2,:),hip_joint_record(3,:),...
+    % Draw the landscape and the leg
+    plot_legend = plot_landscape_leg(landscape_table,leg_contour);
+    % plot(landscape_table(1,:),landscape_table(2,:),'color','k' ,'linewidth', 2);
+
+    title_str = ['\Delta \theta = ',num2str(delta_theta*180/pi),' \circ',...
+             ' , \Delta r = ',num2str(delta_r),' cm , ', landscape_str];
+    title(title_str);
+    axis equal;
+    axis([x_range y_range]); % acorrding to the given landscape
+
+    
+    % plot the trajectory of the hip joint
+    plot_legend.hip = plot(hip_joint_record(2,:),hip_joint_record(3,:),...
                 'marker','.','MarkerSize',2,'color',[0.4660  0.6740  0.1880]);
     
-    
-    title_str = ['\Delta \theta = ',num2str(delta_theta*180/pi),' \circ',...
-                 ' , \Delta r = ',num2str(delta_r),' cm , ', landscape_str];
-    title(title_str);
-    
-    % Draw the leg
-    % Return the contour of the leg boundary
-    boundary = draw_leg(hip_joint, delta_theta, delta_r);
-    axis equal;
-    axis([x_range y_range]);
-    
-    hip_joint_txt = ['Hip joint = (',num2str(hip_joint(1),4),', ',num2str(hip_joint(2),4),' )'];
-    text(hip_joint(1) , hip_joint(2) + 15, hip_joint_txt,'color', 'k');
-    
+
 %     plot(assigned_point(1),assigned_point(2),'marker','*','MarkerSize',10)
 
 
@@ -234,25 +236,24 @@ while delta_theta <= delta_theta_end
         % Does not contact to ground, fall and does not roll.
         
 %         movement_vector = [0 -0.05];
-        movement_vector = [0 -(delta_theta_increment * r)];
+        movement_vector = [0 -(delta_theta_increment * r)]; 
+        %synchronize the falling speed with respect to the forwarding speed
     end
     
     % visualize the hip joint movement by using arrow
     % now hip joint position
     % scaled parameter
-    p_velocity_vector = quiver(hip_joint(1),hip_joint(2),...
+    plot_legend.vel_vector = quiver(hip_joint(1),hip_joint(2),...
                    20*movement_vector(1),20*movement_vector(2),... 
                     'MaxHeadSize',0.5,'color','k'); 
 
     hip_joint = hip_joint + movement_vector;
     
     loop_iteration = loop_iteration + 1;
-    
-%     assigned_point = get_assigned_position(leg_index, hip_joint, delta_theta, delta_r, delta_theta);
 
         
-    legend([p_landscape p_hip_joint p_velocity_vector ],...
-            'Landscape','Hip joint trajectory','Velocity vector');
+    legend([plot_legend.landscape plot_legend.hip plot_legend.leg_1 plot_legend.leg_2 plot_legend.vel_vector],...
+            'Landscape','Hip joint trajectory','Leg_1','Leg_2','Velocity vector');
 
     drawnow;
     hold off;
@@ -265,6 +266,7 @@ while delta_theta <= delta_theta_end
     end
 
 end
+
 if enable_video == 1
     close(writerObj);
     fprintf('video finished\n');
