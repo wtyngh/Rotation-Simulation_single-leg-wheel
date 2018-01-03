@@ -5,7 +5,7 @@
 %
 % Geometry included
 %
-% Last advised : 2017/12/23
+% Last advised : 2018/01/03
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -74,7 +74,7 @@ set(gcf,'name','Leg rotaion simulation','Position', [100 100 1500 800]);
 
 % decide the resolution of the animation; 
 % smaller increment, higher resolution
-delta_theta_increment = pi/200;
+delta_theta_increment = pi/100;
 
 % First trial
 % To get the leg_contour for the further contacting calculation
@@ -104,12 +104,10 @@ while delta_theta <= delta_theta_end
         % tangent of normal force point
         land_diff = lookup_table(landscape_table(1,:),landscape_table(3,:),normal_force_point.point_1(1));  
                 
-        % l* sin(theta), where theta is the angle between tangent vector
-        % and verticle line
+        % l* sin(theta), where theta is the angle between tangent vector and verticle line
         force_distance = abs(normal_force_point.point_1(3))*( x_partition_diff / sqrt(x_partition_diff^2 + land_diff^2) ); 
         
         % The steeper slope, the smaller value, range(0,1]
-%         normal_force_point_slope_exp = exp(-abs(land_diff / x_partition_diff));
         force_distance = force_distance * (0.5);  % for distance estimation error, more reasonable result
         
         force_direction = [-land_diff , x_partition_diff];
@@ -123,19 +121,21 @@ while delta_theta <= delta_theta_end
                -force_mag * land_diff , force_mag * x_partition_diff,... (-y,x)
                 'MaxHeadSize',0.5,'color','b');
         hold on;
-        plot(normal_force_point.point_1(1),normal_force_point.point_1(2),'marker','*','MarkerSize',10,'color','b');
-
+        
+        % plot contacting point
+        plot_legend.contact_point_1 = ...
+            plot(normal_force_point.point_1(1),normal_force_point.point_1(2),'marker','*','MarkerSize',10,'color','b');
+        
+        contact_point_1 = [normal_force_point.point_1(1) , normal_force_point.point_1(2)];
+        rolling_center = contact_point_1;
+        
         % adjust the hip joint
         hip_joint = hip_joint + force_distance * force_direction;
         
-        contact_point = [normal_force_point.point_1(1) , normal_force_point.point_1(2)];
-        
-        contact_point_txt = ['contact point = (',num2str(contact_point(1),4),', ',num2str(contact_point(2),4),' )'];
-        text(contact_point(1) , contact_point(2) - 10, contact_point_txt, 'color', 'b');
-        
     else
-        contact_point = [];
+        contact_point_1 = [];
     end
+    
     
     if ~isempty(normal_force_point.point_2)
 
@@ -160,32 +160,43 @@ while delta_theta <= delta_theta_end
                -force_mag * land_diff, force_mag*x_partition_diff,... (-y,x)
                 'MaxHeadSize',0.5,'color','r');            
         hold on;
-        plot(normal_force_point.point_2(1),normal_force_point.point_2(2),'marker','*','MarkerSize',10,'color','r');
+        % plot contacting point
+        plot_legend.contact_point_2 = ...
+            plot(normal_force_point.point_2(1),normal_force_point.point_2(2),'marker','*','MarkerSize',10,'color','r');
 
+        
+        contact_point_2 = [normal_force_point.point_2(1) , normal_force_point.point_2(2)];
+        rolling_center = contact_point_1;
         
         % Adjust the hip joint
         hip_joint = hip_joint + force_distance * force_direction;
         
-        if isempty(contact_point) 
-            contact_point = [normal_force_point.point_2(1) , normal_force_point.point_2(2)];
+        % redecide rolling center
+        if isempty(contact_point_1) 
+            rolling_center = contact_point_2;
             
-            contact_point_txt = ['contact point = (',num2str(contact_point(1),4),', ',num2str(contact_point(2),4),' )'];
-            text(contact_point(1) , contact_point(2) - 10, contact_point_txt,'color', 'r');
+        elseif contact_point_2(1) > contact_point_1(1)  % Two contact point, the rolling center is the right one
+            rolling_center = contact_point_2;
             
-        elseif normal_force_point.point_2(1) > contact_point(1)  % the point is on the righter side
-            contact_point = [normal_force_point.point_2(1) , normal_force_point.point_2(2)];
-            
-            contact_point_txt = ['contact point = (',num2str(contact_point(1),4),', ',num2str(contact_point(2),4),' )'];
-            text(contact_point(1) , contact_point(2) - 10, contact_point_txt,'color', 'r');
         end
         
+    else
+        contact_point_2 = [];
+    end
+    
+
+    
+    
+    if( isempty(contact_point_1) && isempty(contact_point_2) )
+        rolling_center = [];
+    else
+        rolling_point_txt = ['Rolling point = (',num2str(rolling_center(1),4),', ',num2str(rolling_center(2),4),' )'];
+        text(rolling_center(1) , rolling_center(2) - 10, rolling_point_txt,'color', 'g');
+
+        plot_legend.rolling_point = plot (rolling_center(1), rolling_center(2),'marker','.','MarkerSize',20,'color','g');
     end
     
     
-    if ~isempty(contact_point)
-        p_contact_point = plot (contact_point(1),contact_point(2),'marker','.','MarkerSize',20,'color','c');
-        hold on;
-    end
     
     % Adjust array size with loop
     hip_joint_record(1,loop_iteration) = delta_theta;
@@ -219,15 +230,15 @@ while delta_theta <= delta_theta_end
 
     %% Determin next step : revolution using no-slip assumption 
     
-    if(~isempty(contact_point))
+    if(~isempty(rolling_center))
         % Contact with ground, rolling with respect to the contact point
               
-        rotation_radius_vector = hip_joint - contact_point;
+        rotation_radius_vector = hip_joint - rolling_center; % point to the hip
         rotation_radius_vector_length = sqrt(rotation_radius_vector(1)^2 + rotation_radius_vector(2)^2);
         
         new_rotation_radius_vector =  rotation_radius_vector * [cos(-delta_theta_increment) sin(-delta_theta_increment) 
                                                                -sin(-delta_theta_increment) cos(-delta_theta_increment)] ;
-        movement_vector = (contact_point + new_rotation_radius_vector) - hip_joint;
+        movement_vector = (rolling_center + new_rotation_radius_vector) - hip_joint;
         
         
         delta_theta = delta_theta + delta_theta_increment; %increment delta theta
