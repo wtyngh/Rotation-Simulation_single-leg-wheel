@@ -5,15 +5,21 @@
 %
 % Geometry included
 %
-% Last advised : 2018/01/03
+% Last advised : 2018/01/11
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% opengl info
+
 
 %% Draw the continuous animation with given conditions
 clear variables; clc;
 
-r = 11;  % leg length
-delta_r = 4.5;  % delta leg length
+r = 11;  % leg length (cm)
+delta_r = 0;  % delta leg length (cm)
+mass = 1 ; % define the mass of the structure
+
+static_friction_const = 0.9; % define the equivalent static friction constant between the wheel and the ground 
+mass_vector = [0 -(mass*9.8)];
 
 enable_video = 0;  % switch to 1 to enable video recording
 enable_xls_record = 0;   % switch to 1 to write the data to the excel file
@@ -27,17 +33,17 @@ delta_theta_end = 2 * pi;
 
 %% Define landscape
 x_range = [-25, 150];
-y_range = [-20, 70];
+y_range = [-30, 70];
 
 x_partition_diff = 0.1;
 x_partition = x_range(1):x_partition_diff:x_range(2);  % x_partition
 
-landscape_function = 3;
+landscape_function = 1;
 
 switch(landscape_function)
 % landscape function
     case 1   % Rough terrain
-        landscape_partition = 5 * sin(0.2 * x_partition) + x_partition*0.2 - 5;
+        landscape_partition = 3 * sin(0.2 * x_partition) - x_partition*0.5 - 5;
         landscape_str = 'rough';
     case 2   % Flat terrain
         landscape_partition = 0 * x_partition - 5 ;
@@ -74,7 +80,7 @@ set(gcf,'name','Leg rotaion simulation','Position', [100 100 1500 800]);
 
 % decide the resolution of the animation; 
 % smaller increment, higher resolution
-delta_theta_increment = pi/100;
+delta_theta_increment = pi/200;
 
 % First trial
 % To get the leg_contour for the further contacting calculation
@@ -127,13 +133,16 @@ while delta_theta <= delta_theta_end
             plot(normal_force_point.point_1(1),normal_force_point.point_1(2),'marker','*','MarkerSize',10,'color','b');
         
         contact_point_1 = [normal_force_point.point_1(1) , normal_force_point.point_1(2)];
-        rolling_center = contact_point_1;
+        rolling_point.point = contact_point_1;
+        rolling_point.normal_force_dir = force_direction;
         
         % adjust the hip joint
         hip_joint = hip_joint + force_distance * force_direction;
         
     else
         contact_point_1 = [];
+        rolling_point.point = [];
+        rolling_point.normal_force_dir = [];
     end
     
     
@@ -143,7 +152,7 @@ while delta_theta <= delta_theta_end
         % Visualize the position shifting by using arrow
         % according to the overlap
 
-        force_distance = abs(normal_force_point.point_2(3))*( x_partition_diff / sqrt(x_partition_diff^2 + land_diff^2) );
+        force_distance = abs(normal_force_point.point_2(3))*( x_partition_diff / norm([x_partition_diff, land_diff]) );
         
         
 %         normal_force_point_slope_exp = exp(-abs(land_diff / x_partition_diff))
@@ -152,7 +161,7 @@ while delta_theta <= delta_theta_end
         
         
         force_direction = [-land_diff , x_partition_diff];
-        force_direction = force_direction / (sqrt(land_diff^2+x_partition_diff^2));
+        force_direction = force_direction / (norm([land_diff, x_partition_diff]));
         
         
         force_mag = -50 * normal_force_point.point_2(3);  % scaled parameter
@@ -166,34 +175,35 @@ while delta_theta <= delta_theta_end
 
         
         contact_point_2 = [normal_force_point.point_2(1) , normal_force_point.point_2(2)];
-        rolling_center = contact_point_1;
+        rolling_point.point = contact_point_2;
         
         % Adjust the hip joint
         hip_joint = hip_joint + force_distance * force_direction;
         
         % redecide rolling center
         if isempty(contact_point_1) 
-            rolling_center = contact_point_2;
+            rolling_point.point  = contact_point_2;
+            rolling_point.normal_force_dir = force_direction;
             
         elseif contact_point_2(1) > contact_point_1(1)  % Two contact point, the rolling center is the right one
-            rolling_center = contact_point_2;
+            rolling_point.point  = contact_point_2;
+            rolling_point.normal_force_dir = force_direction;
             
         end
         
     else
         contact_point_2 = [];
     end
-    
-
-    
+       
     
     if( isempty(contact_point_1) && isempty(contact_point_2) )
-        rolling_center = [];
+        rolling_point.point  = [];
+        rolling_point.normal_force_dir = [];
     else
-        rolling_point_txt = ['Rolling point = (',num2str(rolling_center(1),4),', ',num2str(rolling_center(2),4),' )'];
-        text(rolling_center(1) , rolling_center(2) - 10, rolling_point_txt,'color', 'g');
+        rolling_point_txt = ['Rolling point = (',num2str(rolling_point.point (1),4),', ',num2str(rolling_point.point (2),4),' )'];
+        text(rolling_point.point (1) , rolling_point.point (2) - 10, rolling_point_txt,'color', 'c');
 
-        plot_legend.rolling_point = plot (rolling_center(1), rolling_center(2),'marker','.','MarkerSize',20,'color','g');
+        plot_legend.rolling_point = plot (rolling_point.point (1), rolling_point.point (2),'marker','.','MarkerSize',20,'color','g');
     end
     
     
@@ -225,23 +235,69 @@ while delta_theta <= delta_theta_end
                 'marker','.','MarkerSize',2,'color',[0.4660  0.6740  0.1880]);
     
 
-%     plot(assigned_point(1),assigned_point(2),'marker','*','MarkerSize',10)
 
-
-    %% Determin next step : revolution using no-slip assumption 
+    %% Determin next step : revolution considering slip effect 
     
-    if(~isempty(rolling_center))
-        % Contact with ground, rolling with respect to the contact point
+    if(~isempty(rolling_point.point))   % Contact with ground
+        
+        % considering friction effect
+        
+        rolling_point.normal_force = ...
+            dot(-mass_vector, rolling_point.normal_force_dir) * rolling_point.normal_force_dir;
+        
+        rolling_point.tangent_force = (-mass_vector) - rolling_point.normal_force;
+        
+        % max friction force
+        max_static_friction = static_friction_const * norm(rolling_point.normal_force);
+        rolling_point.tangent_force_dir = (rolling_point.tangent_force) / norm(rolling_point.tangent_force);
+        max_static_friction_force = max_static_friction * rolling_point.tangent_force_dir ;
+        
+        
+        quiver(rolling_point.point(1),rolling_point.point(2),...
+        -mass_vector(1),-mass_vector(2),... 
+        'MaxHeadSize',0.5,'color','k');
+        
+        quiver(rolling_point.point(1),rolling_point.point(2),...
+        rolling_point.normal_force(1),rolling_point.normal_force(2),... 
+        'MaxHeadSize',0.5,'color','m');
+        
+        quiver(rolling_point.point(1),rolling_point.point(2),...
+        rolling_point.tangent_force(1),rolling_point.tangent_force(2),... 
+        'MaxHeadSize',0.5,'color','g');
+    
+        quiver(rolling_point.point(1),rolling_point.point(2),...
+        max_static_friction_force(1), max_static_friction_force(2),... 
+        'MaxHeadSize',1,'color','y');
+        
+        
+        
+        
+        
+        
+        if( norm(rolling_point.tangent_force) <= max_static_friction )
+            % No-slip condition, rolling with respect to the contact point
               
-        rotation_radius_vector = hip_joint - rolling_center; % point to the hip
-        rotation_radius_vector_length = sqrt(rotation_radius_vector(1)^2 + rotation_radius_vector(2)^2);
-        
-        new_rotation_radius_vector =  rotation_radius_vector * [cos(-delta_theta_increment) sin(-delta_theta_increment) 
-                                                               -sin(-delta_theta_increment) cos(-delta_theta_increment)] ;
-        movement_vector = (rolling_center + new_rotation_radius_vector) - hip_joint;
-        
-        
-        delta_theta = delta_theta + delta_theta_increment; %increment delta theta
+            rotation_radius_vector = hip_joint - rolling_point.point ; % point to the hip
+            rotation_radius_vector_length = norm(rotation_radius_vector);
+
+            new_rotation_radius_vector =  rotation_radius_vector * [cos(-delta_theta_increment) sin(-delta_theta_increment) 
+                                                                   -sin(-delta_theta_increment) cos(-delta_theta_increment)] ;
+            movement_vector = (rolling_point.point  + new_rotation_radius_vector) - hip_joint;
+
+
+            delta_theta = delta_theta + delta_theta_increment; %increment delta theta
+        else
+            % Slip condition, additional force convert to acceleration
+            
+            
+            movement_vector = ...
+            0.1*(max_static_friction - norm(rolling_point.tangent_force)) * rolling_point.tangent_force_dir;
+            
+            delta_theta = delta_theta + delta_theta_increment; %increment delta theta
+            
+            text(rolling_point.point (1) , rolling_point.point (2) + 10, 'SLIP!','color', 'k');
+            
+        end
         
     else
         % Does not contact to ground, fall and does not roll.
@@ -250,6 +306,14 @@ while delta_theta <= delta_theta_end
         movement_vector = [0 -(delta_theta_increment * r)]; 
         %synchronize the falling speed with respect to the forwarding speed
     end
+    
+    
+    
+    
+    
+    
+    
+    
     
     % visualize the hip joint movement by using arrow
     % now hip joint position
