@@ -32,6 +32,6 @@ function plot_legend = plot_landscape_leg(landscape_table,leg_contour)
     %% show the position of the hip joint
     
     hip_joint_txt = ['Hip joint = (',num2str(leg_contour.center(1),4),', ',num2str(leg_contour.center(2),4),' )'];
-    text(leg_contour.center(1) , leg_contour.center(2) + 20, hip_joint_txt,'color', 'k');
+    text(leg_contour.center(1) , leg_contour.center(2) + 0.2, hip_joint_txt,'color',[0.4660  0.6740  0.1880]);
     
 end
