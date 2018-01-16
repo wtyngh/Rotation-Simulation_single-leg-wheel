@@ -5,7 +5,7 @@
 %
 % Geometry included
 %
-% Last advised : 2018/01/15
+% Last advised : 2018/01/16
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % opengl info
@@ -17,23 +17,26 @@ clear variables; clc;
 timer_total = tic;
 
 r = 0.11;  % leg length (m)
-delta_r = 0.045;  % delta leg length (m) [0 , 0.045]
+delta_r_initial = 0.045;  % delta leg length (m) [0 , 0.045]
 leg_mass = 1 ; % define the mass of the structure (kg)
 
 static_friction_const = 0.8; % define the equivalent static friction constant between the wheel and the ground 
 mass_force = [0 -(leg_mass*9.8)];
-total_external_force = mass_force;
 
 %% Settings
 
-enable_video = 1;  % switch to 1 to enable video recording
-enable_xls_record = 0;   % switch to 1 to write the data to the excel file
-enable_time_elapsed_print = 1;  % switch to 1 to show the time elapsed of each iteration
+enable.video = 1;  % switch to 1 to enable video recording
+enable.xls_record = 0;   % switch to 1 to write the data to the excel file
+enable.time_elapsed_print = 1;  % switch to 1 to show the time elapsed of each iteration
+enable.plot_quiver = 1;  % switch to 1 to show the force quiver including mass and reaction force from the ground
+
+visualization.force = 0.010; % set the quiver factor for the force vector 
+visualization.movement = 25; % set the quiver factor for the movement vector 
 
 %% Inital values
 hip_joint = [0,0.15];  % initail position of the hip joint
 theta_initial = 0; % define the intial posture of the leg
-theta_end = 2 * pi; % define the fianl posture of the leg
+theta_end = theta_initial + 4 * pi; % define the fianl posture of the leg
 
 % define how much time the leg is going to run (sec)
 t_initial = 0;
@@ -55,14 +58,14 @@ t_increment = (t_end - t_initial)/ (num_of_point - 1);
 x_range = [-0.2, 1.5]; % range of the window
 y_range = [-0.2, 0.6];
 
-x_partition_diff = 0.01; % define the resolution of the gound
+x_partition_diff = 0.001; % define the resolution of the gound
 x_partition = x_range(1):x_partition_diff:x_range(2);  % x_partition
 
-landscape_function = 4;  
+landscape_function = 1;  
 
 switch(landscape_function)
     case 1   % Rough terrain
-        landscape_partition = 0.05 * sin(10* x_partition) + x_partition*0.1 ;
+        landscape_partition = 0.05 * sin(15* x_partition) + x_partition*0.1 ;
         landscape_str = 'rough';
     case 2   % Flat terrain
         landscape_partition = 0 * x_partition  ;
@@ -85,12 +88,15 @@ landscape_table(2,:) = landscape_partition;
 landscape_table(3,1) = 0;
 landscape_table(3,2:end) = landscape_partition_diff;
 
-clear x_partition landscape_partition_diff;
+clear x_partition landscape_partition landscape_partition_diff;
 
 %% Video settings
-if enable_video == 1
-    video_filename = ['Theta=',num2str(theta_end*180/pi),'(deg)'...
-                      ', dr=',num2str(delta_r),', ', landscape_str,'.avi'];
+if enable.video == 1
+    video_filename = ['T=',num2str(t_end ),'(s)'...
+                      ', Theta=',num2str(theta_initial*180/pi),'~',num2str(theta_end*180/pi),'(deg)'...
+                      ', dr=',num2str(delta_r_initial),...
+                      ', Fs=',num2str(static_friction_const),...
+                      ', ',landscape_str,'.avi'];
     writerObj = VideoWriter(video_filename);
     writerObj.FrameRate = 1 / t_increment;  % set playing frame rate
     open(writerObj);   
@@ -100,30 +106,12 @@ end
 figure(1)
 set(gcf,'name','Leg rotaion simulation','Position', [100 100 1500 800]);
 
-% decide the resolution of the animation; 
-% smaller increment, higher resolution
-% delta_theta_increment = pi/200;
-
 % First trial
 % To get the leg_contour for the further contacting calculation
-leg_contour = def_leg_contour(hip_joint, theta_initial, delta_r);
-plot_legend = plot_landscape_leg(landscape_table,leg_contour);
-% plot(landscape_table(1,:),landscape_table(2,:),'color','k' ,'linewidth', 2);
+leg_contour = def_leg_contour(hip_joint, theta_initial, delta_r_initial);
 
-title_str = [sprintf('T = %.2f',t_initial), ' (s) , ',...
-            '\Delta \theta = ', sprintf('%.2f',theta_initial*180/pi),' \circ , ',...
-            '\Delta r = ', sprintf('%.1f',delta_r),', ', landscape_str ];
-title(title_str);
-axis equal;
-axis([x_range y_range]); % acorrding to the given landscape
-
-hold off;
 
 %% Main loop start
-
-% loop_iteration = 1;
-% while delta_theta <= delta_theta_end
-
 
 for loop_iteration = 1:num_of_point
 
@@ -132,6 +120,7 @@ for loop_iteration = 1:num_of_point
     t = gait_table(1,loop_iteration);
     theta = gait_table(2,loop_iteration);
     delta_r = gait_table(3,loop_iteration);
+    
     
     %% Check overlap and update the hip joint and contact point
     % Geometric constrian check and fix
@@ -156,15 +145,15 @@ for loop_iteration = 1:num_of_point
         
         % visualize the position shifting  by using arrow
         % according to the overlap
-        force_mag = -100 * normal_force_point.point_1(3);  % scaled parameter for visualization
-        quiver(normal_force_point.point_1(1),normal_force_point.point_1(2),...
-               -force_mag * land_diff , force_mag * x_partition_diff,... (-y,x)
-                'MaxHeadSize',0.5,'color','b');
-        hold on;
+%         force_mag = -100 * normal_force_point.point_1(3);  % scaled parameter for visualization
+%         quiver(normal_force_point.point_1(1),normal_force_point.point_1(2),...
+%                -force_mag * land_diff , force_mag * x_partition_diff,... (-y,x)
+%                 'MaxHeadSize',0.5,'color','b');
         
         % plot contacting point
         plot_legend.contact_point_1 = ...
             plot(normal_force_point.point_1(1),normal_force_point.point_1(2),'marker','*','MarkerSize',10,'color','b');
+        hold on;
         
         contact_point_1 = [normal_force_point.point_1(1) , normal_force_point.point_1(2)];
         rolling_point.point = contact_point_1;
@@ -196,14 +185,14 @@ for loop_iteration = 1:num_of_point
         
         
         force_mag = -100 * normal_force_point.point_2(3);  % scaled parameter
-        quiver(normal_force_point.point_2(1),normal_force_point.point_2(2),...
-               -force_mag * land_diff, force_mag*x_partition_diff,... (-y,x)
-                'MaxHeadSize',0.5,'color','r');            
-        hold on;
+%         quiver(normal_force_point.point_2(1),normal_force_point.point_2(2),...
+%                -force_mag * land_diff, force_mag*x_partition_diff,... (-y,x)
+%                 'MaxHeadSize',0.5,'color','r');            
         % plot contacting point
         plot_legend.contact_point_2 = ...
             plot(normal_force_point.point_2(1),normal_force_point.point_2(2),'marker','*','MarkerSize',10,'color','r');
-
+        hold on;
+        
         
         contact_point_2 = [normal_force_point.point_2(1) , normal_force_point.point_2(2)];
         rolling_point.point = contact_point_2;
@@ -232,11 +221,10 @@ for loop_iteration = 1:num_of_point
         rolling_point.normal_force_dir = [];
     else
         rolling_point_txt = ['Rolling point = (',num2str(rolling_point.point (1),4),', ',num2str(rolling_point.point (2),4),' )'];
-        text(rolling_point.point (1) , rolling_point.point (2) - 0.05, rolling_point_txt,'color', 'k');
+        text(rolling_point.point (1) , rolling_point.point (2) - 0.1, rolling_point_txt,'color', 'k', 'fontsize', 12);
 
         plot_legend.rolling_point = plot (rolling_point.point (1), rolling_point.point (2),'marker','.','MarkerSize',20,'color','g');
     end
-    
     
     
     % Adjust array size with loop
@@ -253,79 +241,54 @@ for loop_iteration = 1:num_of_point
     
     % Draw the landscape and the leg
     plot_legend = plot_landscape_leg(landscape_table,leg_contour);
-    % plot(landscape_table(1,:),landscape_table(2,:),'color','k' ,'linewidth', 2);
 
     title_str = [sprintf('T = %.2f',t), ' (s) , ',...
                 '\Delta \theta = ', sprintf('%.2f',theta*180/pi),' \circ , ',...
-                '\Delta r = ', sprintf('%.1f',delta_r),', ', landscape_str ];
+                '\Delta r = ', sprintf('%.1f',delta_r*100),' (cm) , '...
+                '\mu_s = ', sprintf('%.1f',static_friction_const),' , ', landscape_str ];
             
-
-
-    title(title_str);
+    title(title_str, 'fontsize',18);
     axis equal;
     axis([x_range y_range]); % acorrding to the given landscape
 
     
     % plot the trajectory of the hip joint
     plot_legend.hip = plot(hip_joint_record(3,:),hip_joint_record(4,:),...
-                'marker','.','MarkerSize',2,'color',[0.4660  0.6740  0.1880]);
+                'marker','.','MarkerSize',2,'color',[0.4660    0.6740    0.1880]);
     
 
 
     %% Determin next step : revolution considering slip effect 
     % Force constrains considered
     
-  
-    
     if(~isempty(rolling_point.point))   % Contact with ground
 
         % considering friction effect
 
         rolling_point.normal_force = ...
-            dot(-total_external_force, rolling_point.normal_force_dir) * rolling_point.normal_force_dir;
+            dot(-mass_force  , rolling_point.normal_force_dir) * rolling_point.normal_force_dir;
 
-        rolling_point.tangent_force = (-total_external_force) - rolling_point.normal_force;
+        rolling_point.tangent_force = (-mass_force ) - rolling_point.normal_force;
 
         % max friction force
         max_static_friction = static_friction_const * norm(rolling_point.normal_force);
         rolling_point.tangent_force_dir = (rolling_point.tangent_force) / norm(rolling_point.tangent_force);
         max_static_friction_force = max_static_friction * rolling_point.tangent_force_dir ;
-
-
-        % visualize the reaction force including normal and tangential
         
-%         quiver(rolling_point.point(1),rolling_point.point(2),...
-%         -mass_force(1),-mass_force(2),... 
-%         'MaxHeadSize',0.5,'color','k');
-%         
-%         quiver(rolling_point.point(1),rolling_point.point(2),...
-%         rolling_point.normal_force(1),rolling_point.normal_force(2),... 
-%         'MaxHeadSize',0.5,'color','m');
-%         
-%         quiver(rolling_point.point(1),rolling_point.point(2),...
-%         rolling_point.tangent_force(1),rolling_point.tangent_force(2),... 
-%         'MaxHeadSize',0.5,'color','g');
-%     
-%         quiver(rolling_point.point(1),rolling_point.point(2),...
-%         max_static_friction_force(1), max_static_friction_force(2),... 
-%         'MaxHeadSize',1,'color','y');
-
-
+        rotation_radius_vector = hip_joint - rolling_point.point ; % contact point to the hip
 
         if( norm(rolling_point.tangent_force) <= max_static_friction )
             % calculate the total reaction force provided by ground
             rolling_point.total_reaction_force = rolling_point.normal_force + rolling_point.tangent_force;
             
             % No-slip condition, rolling with respect to the contact point
-            rotation_radius_vector = hip_joint - rolling_point.point ; % contact point to the hip
-            
             % rotate clockwise wrt the contact point
             new_rotation_radius_vector =  rotation_radius_vector * [cos(-theta_increment) sin(-theta_increment) 
                                                                    -sin(-theta_increment) cos(-theta_increment)] ;
            
-            movement_vector = (rolling_point.point  + new_rotation_radius_vector) - hip_joint;
+            movement_vector = (rolling_point.point + new_rotation_radius_vector) - hip_joint;
 
-            text(rolling_point.point (1) , rolling_point.point (2) + 0.25, 'No slip','color', 'k');
+            text(hip_joint(1) , hip_joint(2) + 0.25, 'No slip','color', 'k', 'fontsize', 12);
             
         else
             % Slip condition, additional force convert to acceleration
@@ -334,8 +297,7 @@ for loop_iteration = 1:num_of_point
             rolling_point.total_reaction_force = rolling_point.normal_force + max_static_friction_force;
 
             
-            
-            %********Stay tuned
+            % gravity fraction can't be eliminate by the friction
             movement_vector = ... % 0.01
             (max_static_friction - norm(rolling_point.tangent_force)) * rolling_point.tangent_force_dir ...
             /leg_mass *0.5* 0.01 ;
@@ -343,50 +305,75 @@ for loop_iteration = 1:num_of_point
             % transfer the external force to displacement
         
         
-            text(rolling_point.point (1) , rolling_point.point (2) + 0.25, 'Slipping !','color', 'r');
+            text(hip_joint(1) , hip_joint(2) + 0.25, 'Slipping !','color', 'r','fontsize', 12);
 
         end
        
-%         delta_theta = delta_theta + delta_theta_increment; %increment delta theta
+
+        min_require_torque = cross([rolling_point.total_reaction_force 0],[rotation_radius_vector 0]);
+        min_require_torque = min_require_torque(3); 
+        
+%         additional_external_force = mass_force + rolling_point.total_reaction_force;
+%         additional_acceleration = additional_external_force / leg_mass;
+        
+        
+        % visualize the force including mass, reaction normal and reaction tangential
+        
+        plot_legend.mass_force = quiver(hip_joint(1),hip_joint(2),...
+        mass_force(1) * visualization.force , mass_force(2) * visualization.force,... 
+        'MaxHeadSize',0.5,'color','k', 'LineStyle', ':');
+        
+        plot_legend.reaction_force = quiver(rolling_point.point(1),rolling_point.point(2),...
+        -mass_force(1) * visualization.force , -mass_force(2) * visualization.force,... 
+        'MaxHeadSize',0.5,'color','k', 'LineStyle', ':');
+        
+        % normal reaction force
+        plot_legend.reaction_normal_force = quiver(rolling_point.point(1),rolling_point.point(2),...
+        rolling_point.normal_force(1)*visualization.force , rolling_point.normal_force(2)*visualization.force,... 
+        'MaxHeadSize',0.5,'color',[0.6350 0.0780 0.1840], 'LineStyle', ':'); % brown
+        
+        % tangential reaction force
+        plot_legend.reaction_tangent_force = quiver(rolling_point.point(1),rolling_point.point(2),...
+        rolling_point.tangent_force(1)*visualization.force , rolling_point.tangent_force(2)*visualization.force,... 
+        'MaxHeadSize',0.5,'color',[0.6350 0.0780 0.1840], 'LineStyle', ':'); % brown
+        
+        % max friction
+        plot_legend.max_friction = quiver(rolling_point.point(1),rolling_point.point(2),...
+        max_static_friction_force(1)*visualization.force, max_static_friction_force(2)*visualization.force,... 
+        'MaxHeadSize',0.5,'color',[0.8500 0.3250 0.0980], 'LineStyle', ':');  
+        
+        
         
     else
-        % Does not contact to ground, fall and does not roll.
+        % Does not contact to ground, fall.
         rolling_point.total_reaction_force = 0;
-        
-        movement_vector = mass_force / leg_mass *0.5* (t_increment^2);
+        movement_vector = mass_force / leg_mass *0.5* 0.01;  %(t_increment^2);
 %         movement_vector = [0 -( theta_increment * norm(new_rotation_radius_vector ) )]; 
-        %synchronize the falling speed with respect to the forwarding speed
+        % synchronize the falling speed with respect to the forwarding speed
+        min_require_torque = 0;
+        additional_external_force = 0;
+        text( hip_joint(1) , hip_joint(2) + 0.25, 'Falling !','color', 'k', 'fontsize', 12);
+
     end
-
-    total_external_force = mass_force + rolling_point.total_reaction_force;
-%     if total_external_force ~= 0
-%         disp(total_external_force);
-%     end
-    acceleration = total_external_force / leg_mass;
     
 
-    
-    % visualize the tatol force
-%     quiver(hip_joint(1),hip_joint(2),...
-%     total_force(1), total_force(2),... 
-%     'MaxHeadSize',1,'color','r');
-    
-    
-    
+        
     % visualize the hip joint movement by using arrow
     % now hip joint position
     % scaled parameter
-    plot_legend.vel_vector = quiver(hip_joint(1),hip_joint(2),...
-                   20 * movement_vector(1),20 * movement_vector(2),... 
+    plot_legend.movement = quiver(hip_joint(1),hip_joint(2),...
+                   visualization.movement * movement_vector(1),20 * movement_vector(2),... 
                     'MaxHeadSize',0.5,'color','k'); 
-
+    
+    % apply the movement
     hip_joint = hip_joint + movement_vector; 
 
         
-    legend([plot_legend.landscape plot_legend.hip plot_legend.leg_1 plot_legend.leg_2 plot_legend.vel_vector],...
-            'Landscape','Hip joint trajectory','Leg_1','Leg_2','Velocity vector');
+    legend([plot_legend.landscape plot_legend.hip plot_legend.leg_1 plot_legend.leg_2 plot_legend.movement],...
+            {'Landscape','Hip joint trajectory','Leg_1','Leg_2','Movement vector'},...
+            'FontSize',14);
    
-    if enable_video == 1
+    if enable.video == 1
         videoFrame = getframe(gcf);
         writeVideo(writerObj, videoFrame);
     else
@@ -395,7 +382,7 @@ for loop_iteration = 1:num_of_point
     
     hold off;
     
-    if enable_time_elapsed_print == 1
+    if enable.time_elapsed_print == 1
         time_str = [sprintf('%.1f',(loop_iteration/num_of_point*100)),'%% , ',...
                     sprintf('Elapsed = %.2f(s)', toc(timer_total))...
                     sprintf(', loop = %.2f(s)\n', toc(timer_loop))];
@@ -406,12 +393,12 @@ for loop_iteration = 1:num_of_point
 
 end
 
-if enable_video == 1
+if enable.video == 1
     close(writerObj);
     fprintf('video finished\n');
 end
 
-if enable_xls_record == 1
+if enable.xls_record == 1
     xlsx_tab_str = ['theta=',num2str(theta_end*180/pi),', dr=',num2str(delta_r),', ', landscape_str];
     hip_joint_record = hip_joint_record';
 

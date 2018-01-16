@@ -9,7 +9,7 @@ function half_circle = def_half_circle(center_x, center_y, initial_angle, half_l
 
 %%
     r = 0.11;  % leg radius
-    th = linspace(initial_angle, initial_angle + pi, 100);
+    th = linspace(initial_angle, initial_angle + pi, 500);
     xunit = r * cos(th) + center_x;
     yunit = r * sin(th) + center_y;
 
