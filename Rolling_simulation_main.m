@@ -13,7 +13,7 @@
 
 
 %% Draw the continuous animation with given conditions 
-clear variables; clc;
+clear variables; clc; close all;
 timer_total = tic;
 
 control_mode = 2;
@@ -32,15 +32,15 @@ mu_k = 0.8; % define the equivalent dynamic friction constant
 mass_force = [0 -(leg_mass*9.8)];
 %% Settings 
 
-enable.video = 0;  % switch to 1 to enable video recording
+enable.video = 1;  % switch to 1 to enable video recording
 enable.xls_record = 0;   % switch to 1 to write the data to the excel file
 enable.time_elapsed_print = 1;  % switch to 1 to show the time elapsed of each iteration
 
-enable.plot_quiver = 0;  % switch to 1 to show the force quiver including mass and reaction force from the ground
-enable.plot_required_torque = 0; % switch 1 to show the required_torque
-enable.plot_procedure = 0; % switch 1 to plot all the procedure
+enable.plot_quiver = 1;  % switch to 1 to show the force quiver including mass and reaction force from the ground
+enable.plot_required_torque = 1; % switch 1 to show the required_torque
+enable.plot_procedure = 1; % switch 1 to plot all the procedure
 
-enable.save_final_plot = 1; % switch 1 to save the final plot
+enable.save_final_plot = 0; % switch 1 to save the final plot
 
 visualization.force = 0.02; % set the quiver factor for the force vector 
 visualization.movement = 25; % set the quiver factor for the movement vector 
@@ -58,7 +58,7 @@ V_initial = [0 0] ; % (m/s)
 
 % define the resolution of the animation
 % More points, higher resolution 
-num_of_iterations = 501;
+num_of_iterations = 301;
 
 
 t_array = linspace(t_initial, t_end, num_of_iterations);  % t
@@ -90,8 +90,13 @@ landscape_function_index = 1;
 
 switch(landscape_function_index)
     case 1   % Rough terrain
+        amp = 0.1;
+        freq = 10;
+        bias = 0;
+        
+        
 %         landscape_function = @(x) 0.09*sin(10*x) + x*0.1 ;
-        landscape_function = @(x) 0.09*sin(10*x) +  0;
+        landscape_function = @(x) 0.1*sin(14*x) +  0;
         landscape_str = 'rough';
     case 2   % Flat terrain
         landscape_function = @(x) 0 * x   ;
@@ -101,7 +106,7 @@ switch(landscape_function_index)
 %         % (x_partition, stair_level, level_height)
 %         landscape_str = 'stairs';
     case 4   % parabolic
-        landscape_function = @(x) 0.8 * (x + 0.1).^2  ;  
+        landscape_function = @(x) 0.9 * (x + 0.1).^2  ;  
         landscape_str = 'parabolic';
 end
 
@@ -199,6 +204,7 @@ if enable.plot_procedure == 1
     set(gcf,'name','Leg rotaion simulation','Position', [100 100 1500 800]);
 else
     enable.plot_quiver = 0;
+    enable.plot_required_torque = 0;
 end
 % First trial
 % To get the leg_contour for the further contacting calculation
@@ -274,6 +280,13 @@ for loop_iteration = 1:num_of_iterations
 %         revise_vector_1 = revise_distance * revise_direction;
         revise_vector_1 = contact_point.point_1(3:4);
         
+        
+        % adjust velocity
+        if dot(V_last, -revise_direction) > 0
+            V_last = V_last - dot(V_last, -revise_direction)*(-revise_direction);
+        end
+
+        
     else
         contact_point_1 = [];
         revise_vector_1 = [0,0];
@@ -306,6 +319,12 @@ for loop_iteration = 1:num_of_iterations
         contact_point_2 = [contact_point.point_2(1) , contact_point.point_2(2)];
         revise_vector_2 = contact_point.point_2(3:4);
    
+        % adjust velocity
+        if dot(V_last, -revise_direction) > 0
+            V_last = V_last - dot(V_last, -revise_direction)*(-revise_direction);
+        end
+        
+        
         
         % redecide rolling point w.r.t contact point 2
         if isempty(contact_point_1)
@@ -348,7 +367,27 @@ for loop_iteration = 1:num_of_iterations
     
     
     % Adjust the hip joint position
-    revise_vector = [max(revise_vector_1(1),revise_vector_2(1)) , max(revise_vector_1(2),revise_vector_2(2))];
+    if revise_vector_1(1) * revise_vector_2(1) > 0 %the same dir
+        if abs(revise_vector_1(1)) > abs(revise_vector_2(1))
+            revise_vector(1) = revise_vector_1(1);
+        else
+            revise_vector(1) = revise_vector_2(1);
+        end
+    else  % revise_vector_1(1) * revise_vector_2(1) <= 0
+        revise_vector(1) = revise_vector_1(1) + revise_vector_2(1);
+    end
+        
+    if revise_vector_1(2) * revise_vector_2(2) > 0 %the same dir
+        if abs(revise_vector_1(2)) > abs(revise_vector_2(2))
+            revise_vector(2) = revise_vector_1(2);
+        else
+            revise_vector(2) = revise_vector_2(2);
+        end
+    else  % revise_vector_1(1) * revise_vector_2(1) <= 0
+        revise_vector(2) = revise_vector_1(2) + revise_vector_2(2);
+    end
+
+        
     hip_joint = hip_joint + revise_vector;
     leg_contour = def_leg_contour(hip_joint, theta, delta_r);
     %% Drawings 
@@ -405,6 +444,7 @@ for loop_iteration = 1:num_of_iterations
         
         % Force equilibrium
         rolling_point.reaction_force = leg_mass * acc(1:2) - mass_force;  % F + W = ma
+%         rolling_point.reaction_force = - mass_force; 
         
 %         
 %         if enable.plot_quiver == 1
@@ -477,14 +517,10 @@ for loop_iteration = 1:num_of_iterations
             % tangential reaction force
             plot_legend.reaction_tangent_force = quiver(rolling_point.point(1),rolling_point.point(2),...
             rolling_point.tangent_force(1)*visualization.force , rolling_point.tangent_force(2)*visualization.force,... 
-            'MaxHeadSize',0.5,'color',[0.6350 0.0780 0.1840], 'LineStyle', ':'); % brown
+            'MaxHeadSize',0.5,'color','r', 'LineStyle', ':'); % brown
 
         end
   
-        % adjust velocity
-        if dot(V_last, -rolling_point.normal_force_dir) > 0
-            V_last = V_last - dot(V_last, -rolling_point.normal_force_dir)*(-rolling_point.normal_force_dir);
-        end
 
         
     else
@@ -553,8 +589,9 @@ for loop_iteration = 1:num_of_iterations
         % additional force convert to acceleration   
         % including falling and slipping
         V_now = V_last + acceleration * t_increment;
-        movement_vector = V_last * t_increment + ...
-                          0.5 * acceleration * t_increment^2;
+        movement_vector = V_last * t_increment * 0.1 + 0.5 * acceleration * t_increment^2;
+%         movement_vector = V_last * t_increment + 0.5 * acceleration * t_increment^2;
+                          
     end
 
     V_last = V_now; 
@@ -592,6 +629,7 @@ for loop_iteration = 1:num_of_iterations
     if enable.video == 1
         videoFrame = getframe(gcf);
         writeVideo(writerObj, videoFrame);
+        hold off;
     else
         if enable.plot_procedure == 1
             drawnow;
@@ -717,13 +755,16 @@ if enable.plot_procedure == 0
     
     if enable.save_final_plot == 1
         fig_filename = ['T=',num2str(t_end ),'(s)'...
-                      ', Theta=',num2str(theta_initial*180/pi),'~',num2str(theta_end*180/pi),'(deg)'...
-                      ', dr=',num2str(delta_r_initial),...
-                      ', A=',num2str(amp),...
-                      ', F=',num2str(freq),...
-                      ', b=',num2str(bias),...
-                      ', ','.png'];
-        saveas(gcf,fig_filename);
+                      ',Theta=',num2str(theta_initial*180/pi),'~',num2str(theta_end*180/pi),'(deg)'...
+                      ',dr=',num2str(delta_r_initial),...
+                      ',A=',num2str(amp),...
+                      ',F=',num2str(freq),...
+                      ',b=',num2str(bias),...
+                      '.png'];     
+        
+        currentfolder = pwd;
+        fig_path = fullfile(currentfolder, 'figures');
+        saveas(gca, fullfile(fig_path,fig_filename));
     end
 end
 

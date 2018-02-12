@@ -93,11 +93,7 @@ landscape_str = 'rough';
 landscape_partition = landscape_function(x_partition);
 
 f = fit(x_partition',landscape_partition','fourier2');
-landscape_analysis = [mean(landscape_partition) std(landscape_partition) var(landscape_partition) f.w];
-
-
-
-
+landscape_analysis = [mean(landscape_partition), std(landscape_partition), var(landscape_partition), f.w];
 
 
 str_landscape_function = [num2str(amp),'*sin(',...
@@ -196,6 +192,7 @@ if enable.plot_procedure == 1
     set(gcf,'name','Leg rotaion simulation','Position', [100 100 1500 800]);
 else
     enable.plot_quiver = 0;
+    enable.plot_required_torque = 0;
 end
 % First trial
 % To get the leg_contour for the further contacting calculation
@@ -271,6 +268,13 @@ for loop_iteration = 1:num_of_iterations
 %         revise_vector_1 = revise_distance * revise_direction;
         revise_vector_1 = contact_point.point_1(3:4);
         
+        
+        % adjust velocity
+        if dot(V_last, -revise_direction) > 0
+            V_last = V_last - dot(V_last, -revise_direction)*(-revise_direction);
+        end
+
+        
     else
         contact_point_1 = [];
         revise_vector_1 = [0,0];
@@ -303,6 +307,12 @@ for loop_iteration = 1:num_of_iterations
         contact_point_2 = [contact_point.point_2(1) , contact_point.point_2(2)];
         revise_vector_2 = contact_point.point_2(3:4);
    
+        % adjust velocity
+        if dot(V_last, -revise_direction) > 0
+            V_last = V_last - dot(V_last, -revise_direction)*(-revise_direction);
+        end
+        
+        
         
         % redecide rolling point w.r.t contact point 2
         if isempty(contact_point_1)
@@ -345,7 +355,27 @@ for loop_iteration = 1:num_of_iterations
     
     
     % Adjust the hip joint position
-    revise_vector = [max(revise_vector_1(1),revise_vector_2(1)) , max(revise_vector_1(2),revise_vector_2(2))];
+    if revise_vector_1(1) * revise_vector_2(1) > 0 %the same dir
+        if abs(revise_vector_1(1)) > abs(revise_vector_2(1))
+            revise_vector(1) = revise_vector_1(1);
+        else
+            revise_vector(1) = revise_vector_2(1);
+        end
+    else  % revise_vector_1(1) * revise_vector_2(1) <= 0
+        revise_vector(1) = revise_vector_1(1) + revise_vector_2(1);
+    end
+        
+    if revise_vector_1(2) * revise_vector_2(2) > 0 %the same dir
+        if abs(revise_vector_1(2)) > abs(revise_vector_2(2))
+            revise_vector(2) = revise_vector_1(2);
+        else
+            revise_vector(2) = revise_vector_2(2);
+        end
+    else  % revise_vector_1(1) * revise_vector_2(1) <= 0
+        revise_vector(2) = revise_vector_1(2) + revise_vector_2(2);
+    end
+
+        
     hip_joint = hip_joint + revise_vector;
     leg_contour = def_leg_contour(hip_joint, theta, delta_r);
     %% Drawings 
@@ -402,6 +432,7 @@ for loop_iteration = 1:num_of_iterations
         
         % Force equilibrium
         rolling_point.reaction_force = leg_mass * acc(1:2) - mass_force;  % F + W = ma
+%         rolling_point.reaction_force = - mass_force; 
         
 %         
 %         if enable.plot_quiver == 1
@@ -474,14 +505,10 @@ for loop_iteration = 1:num_of_iterations
             % tangential reaction force
             plot_legend.reaction_tangent_force = quiver(rolling_point.point(1),rolling_point.point(2),...
             rolling_point.tangent_force(1)*visualization.force , rolling_point.tangent_force(2)*visualization.force,... 
-            'MaxHeadSize',0.5,'color',[0.6350 0.0780 0.1840], 'LineStyle', ':'); % brown
+            'MaxHeadSize',0.5,'color','r', 'LineStyle', ':'); % brown
 
         end
   
-        % adjust velocity
-        if dot(V_last, -rolling_point.normal_force_dir) > 0
-            V_last = V_last - dot(V_last, -rolling_point.normal_force_dir)*(-rolling_point.normal_force_dir);
-        end
 
         
     else
@@ -550,8 +577,9 @@ for loop_iteration = 1:num_of_iterations
         % additional force convert to acceleration   
         % including falling and slipping
         V_now = V_last + acceleration * t_increment;
-        movement_vector = V_last * t_increment + ...
-                          0.5 * acceleration * t_increment^2;
+        movement_vector = V_last * t_increment * 0.1 + 0.5 * acceleration * t_increment^2;
+%         movement_vector = V_last * t_increment + 0.5 * acceleration * t_increment^2;
+                          
     end
 
     V_last = V_now; 
@@ -589,6 +617,7 @@ for loop_iteration = 1:num_of_iterations
     if enable.video == 1
         videoFrame = getframe(gcf);
         writeVideo(writerObj, videoFrame);
+        hold off;
     else
         if enable.plot_procedure == 1
             drawnow;
@@ -640,10 +669,11 @@ traveled_landscape.length = trapz(hypot( diff(traveled_landscape.points(1,:)) , 
 
 hip_joint_vs_landscape_length_ratio = hip_joint_trajectory_length / traveled_landscape.length
 work_per_landscape_length = total_work_abs / traveled_landscape.length
+average_speed = hip_joint_trajectory_length / (t_end - t_initial)
 
 % data_record(6,1) = hip_joint_vs_landscape_length_ratio;
 % data_record(7,1) = work_per_landscape_length;
-
+% data_record(8,1) = average_speed;
 
 %%
 if enable.video == 1
@@ -692,9 +722,10 @@ if enable.plot_procedure == 0
     
     Analysis_1_txt = ['hip joint / landscape length  = ',num2str(hip_joint_vs_landscape_length_ratio)] ;
     Analysis_2_txt = ['work / landscape length = ',num2str(work_per_landscape_length)] ;
+    Analysis_3_txt = ['average speed = ',num2str(average_speed)] ;
     text( x_range(2) - 0.55 , y_range(2) - 0.05 , Analysis_1_txt ,'color', 'k', 'fontsize', 12);
     text( x_range(2) - 0.55 , y_range(2) - 0.09 , Analysis_2_txt ,'color', 'k', 'fontsize', 12);
-    
+    text( x_range(2) - 0.55 , y_range(2) - 0.13 , Analysis_3_txt ,'color', 'k', 'fontsize', 12);
 
     text( x_range(1) + 0.05 , y_range(2) - 0.05, landscape_str_full,'color', 'k','fontsize', 12)
     % plot the trajectory of the hip joint
@@ -714,19 +745,23 @@ if enable.plot_procedure == 0
     
     if enable.save_final_plot == 1
         fig_filename = ['T=',num2str(t_end ),'(s)'...
-                      ', Theta=',num2str(theta_initial*180/pi),'~',num2str(theta_end*180/pi),'(deg)'...
-                      ', dr=',num2str(delta_r_initial),...
-                      ', A=',num2str(amp),...
-                      ', F=',num2str(freq),...
-                      ', b=',num2str(bias),...
-                      ', ','.png'];
-        saveas(gcf,fig_filename);
+                      ',Theta=',num2str(theta_initial*180/pi),'~',num2str(theta_end*180/pi),'(deg)'...
+                      ',dr=',num2str(delta_r_initial),...
+                      ',A=',num2str(amp),...
+                      ',F=',num2str(freq),...
+                      ',b=',num2str(bias),...
+                      '.png'];     
+        
+        currentfolder = pwd;
+        fig_path = fullfile(currentfolder, 'figures');
+        saveas(gca, fullfile(fig_path,fig_filename));
     end
 end
 
 data.landscape_analysis = landscape_analysis;
 data.work_per_landscape_length = work_per_landscape_length;
 data.hip_joint_vs_landscape_length_ratio = hip_joint_vs_landscape_length_ratio;
+data.average_speed = average_speed;
 data.data_record = data_record;
 end
 

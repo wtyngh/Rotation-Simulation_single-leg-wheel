@@ -16,13 +16,8 @@ clear variables; clc;
 %% 
 
 % a = linspace(1,1,100);
-x = 0:0.1:10;
-y = gaussmf(x,[2 5]);
-y1 = gaussmf(x,[3 5]);
-plot(x,y)
-hold on;
-plot(x,y1)
-xlabel('gaussmf')
+a = [1,2]
+c(1,:) =[a,1,3] 
 % mean(y)
 % var(y)
 
