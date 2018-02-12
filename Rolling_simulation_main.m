@@ -6,7 +6,7 @@
 % Geometry included
 % Dynamic condisered
 %
-% Last advised : 2018/02/01
+% Last advised : 2018/02/12
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % opengl info
@@ -32,12 +32,15 @@ mu_k = 0.8; % define the equivalent dynamic friction constant
 mass_force = [0 -(leg_mass*9.8)];
 %% Settings 
 
-enable.video = 1;  % switch to 1 to enable video recording
+enable.video = 0;  % switch to 1 to enable video recording
 enable.xls_record = 0;   % switch to 1 to write the data to the excel file
 enable.time_elapsed_print = 1;  % switch to 1 to show the time elapsed of each iteration
-enable.plot_quiver = 1;  % switch to 1 to show the force quiver including mass and reaction force from the ground
-enable.plot_required_torque = 1; % switch 1 to show the required_torque
-enable.plot_procedure = 1; % switch 1 to plot all the procedure
+
+enable.plot_quiver = 0;  % switch to 1 to show the force quiver including mass and reaction force from the ground
+enable.plot_required_torque = 0; % switch 1 to show the required_torque
+enable.plot_procedure = 0; % switch 1 to plot all the procedure
+
+enable.save_final_plot = 1; % switch 1 to save the final plot
 
 visualization.force = 0.02; % set the quiver factor for the force vector 
 visualization.movement = 25; % set the quiver factor for the movement vector 
@@ -83,11 +86,12 @@ y_range = [-0.2, 0.6];
 x_partition_diff = 0.001; % define the resolution of the gound
 x_partition = x_range(1):x_partition_diff:x_range(2);  % x_partition
 
-landscape_function_index = 4;  
+landscape_function_index = 1;  
 
 switch(landscape_function_index)
     case 1   % Rough terrain
-        landscape_function = @(x) 0.09*sin(10*x) + x*0.1 ;
+%         landscape_function = @(x) 0.09*sin(10*x) + x*0.1 ;
+        landscape_function = @(x) 0.09*sin(10*x) +  0;
         landscape_str = 'rough';
     case 2   % Flat terrain
         landscape_function = @(x) 0 * x   ;
@@ -490,7 +494,9 @@ for loop_iteration = 1:num_of_iterations
         rotation_radius_vector = [0,0];
 
         isRolling = false;  % not static, considering kinetics
-        text(  x_range(1) + 0.05 , y_range(2) - 0.1, 'Falling !','color', 'k', 'fontsize', 12);
+        if enable.plot_quiver == 1
+            text(  x_range(1) + 0.05 , y_range(2) - 0.1, 'Falling !','color', 'k', 'fontsize', 12);
+        end
     end
     
     total_force = rolling_point.reaction_force + mass_force;
@@ -589,9 +595,10 @@ for loop_iteration = 1:num_of_iterations
     else
         if enable.plot_procedure == 1
             drawnow;
+            hold off;
         end
     end
-    hold off;
+    
     
     % print the elapsed time
     if enable.time_elapsed_print == 1
@@ -618,7 +625,8 @@ for loop_iteration = 1:num_of_iterations
 end
 
 %% Calculation
-% Calculate min. required work
+% Calculate required work
+% Work = torque * w
 total_work = trapz( data_record(1,:),data_record(5,:));
 total_work_abs = trapz( data_record(1,:) , abs(data_record(5,:)) );
 
@@ -626,7 +634,8 @@ total_work_abs = trapz( data_record(1,:) , abs(data_record(5,:)) );
 % Calculate integrand from x,y derivatives, and integrate to calculate arc length
 hip_joint_trajectory_length =  trapz(hypot(   diff( data_record(3,:) ), diff( data_record(4,:) )  ));   
 
-% Calculate the length of the landscape, where the hip joint has traveled 
+% Calculate the length of the landscape, where the hip joint has traveled
+% hip joint x-part projection
 traveled_landscape.points = [data_record(3,:) ; 
                             interp1(x_partition, landscape_table(2,:), data_record(3,:) )];
 traveled_landscape.length = trapz(hypot( diff(traveled_landscape.points(1,:)) , diff(traveled_landscape.points(2,:)) ));
@@ -660,12 +669,66 @@ if enable.xls_record == 1
 end
 
 fprintf('Total time = %f sec\n', toc(timer_total));
-%%
-% figure(2)
-% set(gcf,'name','minimun torque require');
-% plot(data_record(1,:),data_record(7,:),'linewidth',1.5);
-% hold on;
-% plot([0 t_end],[0 0],'--','color',[0.01 0.01 0.01]);
-% title('Minimun torque require');
-% xlabel('time (s)');
-% ylabel('Torque (Nm)');
+%% Roughly estimate the correctness
+if enable.plot_procedure == 0
+    figure(1)
+    set(gcf,'name','Leg rotaion simulation','Position', [100 100 1500 800]);
+    
+    subplot(5,1,1:4);
+    % Draw the landscape and the leg
+    plot_legend = plot_landscape_leg(landscape_table,leg_contour);
+    hold on;
+    title_str = [sprintf('T = %.2f',t), ' (s) , ',...
+                '\Delta \theta = ', sprintf('%.2f',theta*180/pi),' \circ , ',...
+                '\Delta r = ', sprintf('%.1f',delta_r*100),' (cm) , '...
+                '\mu_s = ', sprintf('%.1f',mu_s),...
+                ' , \mu_k = ', sprintf('%.1f',mu_k),...
+                ' , ', landscape_str ];
+
+    title(title_str, 'fontsize',18);
+    axis equal;
+    axis([x_range y_range]); % acorrding to the given landscape
+
+    V_txt = ['V = (',sprintf('%.2f',V_last(1)),',',...
+    sprintf('%.2f',V_last(2)),') , |V| = ',sprintf('%.2f',norm(V_last)),'(m/s)'] ;
+    text( x_range(2) - 0.4 , y_range(1) + 0.08 , V_txt ,'color', 'k', 'fontsize', 12);
+    
+    Analysis_1_txt = ['hip joint / landscape length  = ',num2str(hip_joint_vs_landscape_length_ratio)] ;
+    Analysis_2_txt = ['work / landscape length = ',num2str(work_per_landscape_length)] ;
+    text( x_range(2) - 0.55 , y_range(2) - 0.05 , Analysis_1_txt ,'color', 'k', 'fontsize', 12);
+    text( x_range(2) - 0.55 , y_range(2) - 0.09 , Analysis_2_txt ,'color', 'k', 'fontsize', 12);
+    
+
+    text( x_range(1) + 0.05 , y_range(2) - 0.05, landscape_str_full,'color', 'k','fontsize', 12)
+    % plot the trajectory of the hip joint
+    plot_legend.hip = plot(data_record(3,:),data_record(4,:),...
+            'marker','.','MarkerSize',2,'color',[0.4660   0.6740   0.1880]);
+        
+%     figure(2)
+%     set(gcf,'name','minimun torque require');
+    subplot(5,1,5);
+    plot(data_record(1,:),data_record(5,:),'linewidth',1.5);
+    hold on;
+    plot([0 t_end],[0 0],'--','color',[0.01 0.01 0.01]);
+    title('Minimun torque require');
+    xlabel('time (s)');
+    ylabel('Torque (Nm)');
+    hold off;
+    
+    if enable.save_final_plot == 1
+        fig_filename = ['T=',num2str(t_end ),'(s)'...
+                      ', Theta=',num2str(theta_initial*180/pi),'~',num2str(theta_end*180/pi),'(deg)'...
+                      ', dr=',num2str(delta_r_initial),...
+                      ', A=',num2str(amp),...
+                      ', F=',num2str(freq),...
+                      ', b=',num2str(bias),...
+                      ', ','.png'];
+        saveas(gcf,fig_filename);
+    end
+end
+
+
+
+
+
+
