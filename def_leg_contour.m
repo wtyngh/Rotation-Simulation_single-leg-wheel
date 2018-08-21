@@ -22,9 +22,13 @@ function leg_contour = def_leg_contour(hip_joint, delta_theta, delta_r)
     
     leg_contour.leg_1.contour = half_circle_1;
     leg_contour.leg_1.center = leg_1_center;
+    leg_contour.leg_1.tip = [leg_contour.leg_1.contour.x(1),leg_contour.leg_1.contour.y(1)];
+    leg_contour.leg_1.toe = [leg_contour.leg_1.contour.x(end),leg_contour.leg_1.contour.y(end)];
     
     leg_contour.leg_2.contour = half_circle_2;
     leg_contour.leg_2.center = leg_2_center;
+    leg_contour.leg_2.tip = [leg_contour.leg_2.contour.x(1),leg_contour.leg_2.contour.y(1)];
+    leg_contour.leg_2.toe = [leg_contour.leg_2.contour.x(end),leg_contour.leg_2.contour.y(end)];
     
     leg_contour.center = hip_joint;
 end
