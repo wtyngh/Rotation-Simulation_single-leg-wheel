@@ -1,7 +1,7 @@
 function stair_landscape = craete_stair_landscape(x_partition, stair_level, level_height)
     % testing
 %     clc; clear variables;
-%     x_range = [0, 150];
+%     x_range = [0, 10];
 %     x_partition_diff = 0.1;
 %     x_partition = x_range(1):x_partition_diff:x_range(2);  % x_partition
 %     stair_level = 3;

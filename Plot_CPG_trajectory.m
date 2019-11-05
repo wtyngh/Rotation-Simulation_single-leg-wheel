@@ -23,14 +23,14 @@ for mode = 1:4
             t_array = linspace(0,t_elapsed,num_of_iterations);
             r_array = 0 * theta_array + delta_r_initial ;  % constant delta_r
         case 3
-            xlsx_tab_str = 'Trot, V=400';
+            xlsx_tab_str = 'Trot, V=0.4';
             input_data = xlsread([input_data_filename,'.xlsx'],xlsx_tab_str);
 
             t_array = input_data(:,1);
             theta_array = input_data(:,2);
             r_array = input_data(:,3);
         case 4
-            xlsx_tab_str = 'Walk, V=400';
+            xlsx_tab_str = 'Walk, V=0.4';
             input_data = xlsread([input_data_filename,'.xlsx'],xlsx_tab_str);
 
             t_array = input_data(:,1);

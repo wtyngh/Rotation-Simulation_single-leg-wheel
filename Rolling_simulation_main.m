@@ -8,7 +8,7 @@
 %
 % Position control, input 'time-theta, time-r' trajectory
 %
-% Last advised : 2018/04/10
+% Last advised : 2019/07/21
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % opengl info
@@ -40,22 +40,27 @@ mu_k = 0.9; % define the equivalent dynamic friction constant
 mass_force = [0 -(leg_mass*9.8)];
 %% Settings 
 
-enable.video = 1;  % switch to 1 to enable video recording
+enable.video = 0;  % switch to 1 to enable video recording
 
 enable.xls_record = 0;   % switch to 1 to write the data to the excel file
 enable.time_elapsed_print = 1;  % switch to 1 to show the time elapsed of each iteration
 
+enable.plot_procedure = 0; % switch 1 to plot all the procedure
 enable.plot_quiver = 0;  % switch to 1 to show the force quiver including mass and reaction force from the ground
 enable.plot_required_torque = 0; % switch 1 to show the required_torque
-enable.plot_procedure = 0; % switch 1 to plot all the procedure
+    enable_analysis_text = 0;
+    enable_v_a = 1;
 
 enable.save_final_plot = 0; % switch 1 to save the final plot
 
 visualization.force = 0.005; % set the quiver factor for the force vector 
 visualization.movement = 25; % set the quiver factor for the movement vector 
 
-
-
+window_size = [100 100 1000 500];
+title_fontsize = 13;
+label_fontsize = 12;
+text_fontsize = 13;
+legend_fontsize = 12;
 %% Inital values 
 % 
 hip_joint_initial = [0,0.2];  % initail position of the hip joint
@@ -109,9 +114,9 @@ switch trajectory_mode
         % Load trajectory data
         input_trajectory_data_filename = 'CPG trajectory';
         if trajectory_mode == 3
-            input_xlsx_tab_str = 'Trot, V=400';
+            input_xlsx_tab_str = 'Trot, V=0.2';
         else  % trajectory_mode == 4
-            input_xlsx_tab_str = 'Walk, V=400';     
+            input_xlsx_tab_str = 'Walk, V=0.2';     
         end
 
         input_trajectory_data = xlsread([input_trajectory_data_filename,'.xlsx'],input_xlsx_tab_str);
@@ -166,8 +171,8 @@ alpha_array = [0,diff(omega_array)/t_increment];
 
 %% Define landscape 
 
-x_range = [-0.5, 4.5]; % range of the window
-y_range = [-0.35, 1.0];
+x_range = [-0.5, 3]; % range of the window [-0.5, 4]
+y_range = [-0.2, 0.6];  % [-0.2, 1.0]
 
 x_partition_diff = 0.001; % define the resolution of the gound
 x_partition = x_range(1):x_partition_diff:x_range(2);  % x_partition
@@ -183,8 +188,8 @@ switch(landscape_function_index)
         landscape_function = @(x) 0 * x   ;
         landscape_str = 'flat';
     case 3   % Stairs
-        level_height = 0.105;
-        landscape_partition = craete_stair_landscape(x_partition, 8, level_height) ;  
+        level_height = 0.10;
+        landscape_partition = craete_stair_landscape(x_partition, 4, level_height) ;   % 10
         % (x_partition, stair_level, level_height)
         landscape_str = 'stairs';
     case 4   % parabolic
@@ -305,7 +310,7 @@ if enable.plot_procedure == 1
     enable.plot_quiver = 1;
     enable.plot_required_torque = 1;
     figure(1)
-    set(gcf,'name','Leg rotaion simulation','Position', [100 100 1500 800]);
+    set(gcf,'name','Leg rotaion simulation','Position', window_size);
 else
     enable.plot_quiver = 0;
     enable.plot_required_torque = 0;
@@ -478,7 +483,7 @@ for loop_iteration = 1:num_of_iterations
         isContact = true;
         if enable.plot_procedure == 1
             rolling_point_txt = ['Rolling point = (',num2str(rolling_point.point (1),4),', ',num2str(rolling_point.point (2),4),' )'];
-            text(rolling_point.point (1) , rolling_point.point (2) - 0.1, rolling_point_txt,'color', 'k', 'fontsize', 14);
+            text(rolling_point.point (1) , rolling_point.point (2) - 0.1, rolling_point_txt,'color', 'k', 'fontsize', text_fontsize);
 
             plot_legend.rolling_point = plot (rolling_point.point (1), rolling_point.point (2),'marker','.','MarkerSize',20,'color','g');
         end
@@ -520,7 +525,7 @@ for loop_iteration = 1:num_of_iterations
 
 
     if(rolling_point.istoe)
-        text( x_range(1) + 0.05 , y_range(2) - 0.25, 'Is Toe !','color', 'b','fontsize', 14);
+        text( x_range(1) + 0.05 , y_range(2) - 0.25, 'Is Toe !','color', 'b','fontsize', text_fontsize);
     end
     
      
@@ -539,17 +544,18 @@ for loop_iteration = 1:num_of_iterations
                     ', ',input_trajectory_data_filename,...
                     ', ',input_xlsx_tab_str ];
 
-        title(title_str, 'fontsize',18);
-        xlabel('x [m]','FontSize',14);
-        ylabel('y [m]','FontSize',14);
+        title(title_str, 'fontsize',title_fontsize);
+        xlabel('x [m]','FontSize',label_fontsize);
+        ylabel('y [m]','FontSize',label_fontsize);
         axis equal;
         axis([x_range y_range]); % acorrding to the given landscape
 
         V_txt = ['V = (',sprintf('%.2f',V_now(1)),',',...
         sprintf('%.2f',V_now(2)),') , |V| = ',sprintf('%.2f',norm(V_now)),'[m/s]'] ;
-        text( x_range(2) - 2 , y_range(1) + 0.2 , V_txt ,'color', 'k', 'fontsize', 14);
-        
-        text( x_range(1) + 0.05 , y_range(2) - 0.05, landscape_str_full,'color', 'k','fontsize', 14)
+        if enable_v_a == 1
+            text( x_range(2) - 1.5 , y_range(1) + 0.2 , V_txt ,'color', 'k', 'fontsize', text_fontsize);
+        end
+        text( x_range(1) + 0.05 , y_range(2) - 0.05, landscape_str_full,'color', 'k','fontsize', text_fontsize)
     end
    
     %% Determin next step : revolution considering slip effect 
@@ -610,8 +616,7 @@ for loop_iteration = 1:num_of_iterations
         
         friction_force_sign = sign(dot(rolling_point.reaction_force, rolling_point.tangent_force_dir));
         
-        
-        
+       
         % forward: pos value ; backward : neg value
         
         
@@ -656,7 +661,7 @@ for loop_iteration = 1:num_of_iterations
             
             isRolling = true;
             if enable.plot_procedure == 1
-                text( x_range(1) + 0.05 , y_range(2) - 0.15, 'No slip','color', 'k', 'fontsize', 14);
+                text( x_range(1) + 0.05 , y_range(2) - 0.15, 'No slip','color', 'k', 'fontsize', text_fontsize);
             end
         else
             % Slip condition
@@ -671,9 +676,9 @@ for loop_iteration = 1:num_of_iterations
             if enable.plot_procedure == 1
                 
                 if max_static_friction == 0
-                    text( x_range(1) + 0.05 , y_range(2) - 0.15, 'Falling !','color', 'r','fontsize', 14);
+                    text( x_range(1) + 0.05 , y_range(2) - 0.15, 'Falling !','color', 'r','fontsize', text_fontsize);
                 else
-                    text( x_range(1) + 0.05 , y_range(2) - 0.15, 'Slipping !','color', 'r','fontsize', 14);
+                    text( x_range(1) + 0.05 , y_range(2) - 0.15, 'Slipping !','color', 'r','fontsize', text_fontsize);
                 end
             end 
         end
@@ -709,7 +714,7 @@ for loop_iteration = 1:num_of_iterations
 
         isRolling = false;  % not static, considering kinetics
         if enable.plot_procedure == 1
-            text(  x_range(1) + 0.05 , y_range(2) - 0.15, 'Falling !','color', 'k', 'fontsize', 14);
+            text(  x_range(1) + 0.05 , y_range(2) - 0.15, 'Falling !','color', 'k', 'fontsize', text_fontsize);
         end
     end
     
@@ -730,11 +735,10 @@ for loop_iteration = 1:num_of_iterations
     required_torque = required_torque(3);
     
     
-    if enable.plot_procedure == 1
-    
+    if enable_v_a == 1
         a_txt = ['a = (',sprintf('%.2f',ture_acceleration(1)),',',...
         sprintf('%.2f',ture_acceleration(2)),') , |a| = ',sprintf('%.2f',norm(ture_acceleration)),'[m/s^2]'] ;
-        text( x_range(2) - 2 , y_range(1) + 0.1 , a_txt ,'color', 'k', 'fontsize', 14);
+        text( x_range(2) - 1.5 , y_range(1) + 0.1 , a_txt ,'color', 'k', 'fontsize', text_fontsize);
     
     end
 
@@ -803,14 +807,17 @@ for loop_iteration = 1:num_of_iterations
 
         % plot the legend
         if enable.plot_quiver == 1
-            legend([plot_legend.landscape,plot_legend.hip,plot_legend.leg_1,plot_legend.leg_2,plot_legend.movement,...
+            legend([plot_legend.landscape,plot_legend.hip,plot_legend.movement,...
                     plot_legend.total_force],...
-            {'Landscape','Hip joint trajectory','Leg_1','Leg_2','Movement vector','Total force'},...
-            'FontSize',14);    
+            {'Landscape','Hip joint trajectory','Movement vector','Total force'},...
+            'FontSize',text_fontsize ,'location','northeast');    
         else
-            legend([plot_legend.landscape plot_legend.hip plot_legend.leg_1 plot_legend.leg_2 plot_legend.movement],...
-            {'Landscape','Hip joint trajectory','Leg_1','Leg_2','Movement vector'},...
-            'FontSize',14);
+%             legend([plot_legend.landscape plot_legend.hip plot_legend.leg_1 plot_legend.leg_2 plot_legend.movement],...
+%             {'Landscape','Hip joint trajectory','Leg_1','Leg_2','Movement vector'},...
+%             'FontSize',text_fontsize);
+            legend([plot_legend.landscape plot_legend.hip plot_legend.movement],...
+            {'Landscape','Hip joint trajectory','Movement vector'},...
+            'FontSize',text_fontsize, 'location','northeast');
         end
     end
         
@@ -840,9 +847,9 @@ for loop_iteration = 1:num_of_iterations
         plot(data_record(1,:),data_record(6,:),'color',[ 0    0.4470    0.7410],'linewidth',1.5);
         hold on;
         plot([0 t_end],[0 0],'--','color',[0.01 0.01 0.01]);
-        title(['Minimun torque require = ',sprintf('%.2f',required_torque),' [Nm]'],'FontSize',14);
-        xlabel('time [s]','FontSize',14);
-        ylabel('Torque [Nm]','FontSize',14);
+        title(['Minimun torque require = ',sprintf('%.2f',required_torque),' [Nm]'],'FontSize',text_fontsize);
+        xlabel('time [s]','FontSize',label_fontsize);
+        ylabel('Torque [Nm]','FontSize',label_fontsize);
         xlim([t_initial t_end]);
         hold off;
 
@@ -929,7 +936,7 @@ fprintf('Total time = %f sec\n', toc(timer_total));
 %% Roughly estimate the correctness by the final plot
 % if enable.plot_procedure == 0
     figure(1)
-    set(gcf,'name','Leg rotaion simulation','Position', [100 100 1500 800]);
+    set(gcf,'name','Leg rotaion simulation','Position', window_size);
     
     subplot(5,1,1:4);
     % Draw the landscape and the leg
@@ -944,40 +951,41 @@ fprintf('Total time = %f sec\n', toc(timer_total));
 %                 '\Delta \theta = ', sprintf('%.2f',theta*180/pi),' \circ , ',...
 %                 '\Delta r = ', sprintf('%.1f',delta_r*100),' (cm) , '...
 
-    title(title_str, 'fontsize',18);
-    xlabel('x [m]');
-    ylabel('y [m]');
+    title(title_str, 'fontsize',title_fontsize);
+    xlabel('x [m]','FontSize',label_fontsize);
+    ylabel('y [m]','FontSize',label_fontsize);
     axis equal;
     axis([x_range y_range]); % acorrding to the given landscape
+    if enable_v_a == 1
+        V_txt = ['V = (',sprintf('%.2f',V_now(1)),',',...
+        sprintf('%.2f',V_now(2)),') , |V| = ',sprintf('%.2f',norm(V_now)),'[m/s]'] ;
+    %     text( x_range(2) - 1.5 , y_range(1) + 0.14 , V_txt ,'color', 'k', 'fontsize', text_fontsize);
 
-    V_txt = ['V = (',sprintf('%.2f',V_now(1)),',',...
-    sprintf('%.2f',V_now(2)),') , |V| = ',sprintf('%.2f',norm(V_now)),'[m/s]'] ;
-%     text( x_range(2) - 1.5 , y_range(1) + 0.14 , V_txt ,'color', 'k', 'fontsize', 14);
-    
-    a_txt = ['a = (',sprintf('%.2f',ture_acceleration(1)),',',...
-    sprintf('%.2f',ture_acceleration(2)),') , |a| = ',sprintf('%.2f',norm(ture_acceleration)),'[m/s^2]'] ;
-%     text( x_range(2) - 1.5 , y_range(1) + 0.07 , a_txt ,'color', 'k', 'fontsize', 14);
-    
+        a_txt = ['a = (',sprintf('%.2f',ture_acceleration(1)),',',...
+        sprintf('%.2f',ture_acceleration(2)),') , |a| = ',sprintf('%.2f',norm(ture_acceleration)),'[m/s^2]'] ;
+    %     text( x_range(2) - 1.5 , y_range(1) + 0.07 , a_txt ,'color', 'k', 'fontsize', text_fontsize);
+    end
     
     Analysis_1_txt = ['hip joint / landscape length  = ',num2str(hip_joint_vs_landscape_length_ratio,'%.4f'), ' [m/m]'] ;
     Analysis_2_txt = ['work / landscape length = ',num2str(work_per_landscape_length,'%.4f'), ' [J/m]'] ;
     Analysis_3_txt = ['average speed x = ',num2str(average_speed_x,'%.4f'), ' [m/s]'] ;
     Analysis_4_txt = ['hip y delta sum = ',num2str(hip_joint_y_delta,'%.4f'), ' [m/m]'] ;
+    if enable_analysis_text == 1
+        text( x_range(2) - 2.5 , y_range(2) - 0.08 , Analysis_1_txt ,'color', 'k', 'fontsize', text_fontsize);
+        text( x_range(2) - 2.5 , y_range(2) - 0.16 , Analysis_2_txt ,'color', 'k', 'fontsize', text_fontsize);
+        text( x_range(2) - 2.5 , y_range(2) - 0.24 , Analysis_3_txt ,'color', 'k', 'fontsize', text_fontsize);
+        text( x_range(2) - 2.5 , y_range(2) - 0.32 , Analysis_4_txt ,'color', 'k', 'fontsize', text_fontsize);
+    end
     
-    text( x_range(2) - 2.5 , y_range(2) - 0.08 , Analysis_1_txt ,'color', 'k', 'fontsize', 14);
-    text( x_range(2) - 2.5 , y_range(2) - 0.16 , Analysis_2_txt ,'color', 'k', 'fontsize', 14);
-    text( x_range(2) - 2.5 , y_range(2) - 0.24 , Analysis_3_txt ,'color', 'k', 'fontsize', 14);
-    text( x_range(2) - 2.5 , y_range(2) - 0.32 , Analysis_4_txt ,'color', 'k', 'fontsize', 14);
     
-    
-    text( x_range(1) + 0.05 , y_range(2) - 0.05, landscape_str_full,'color', 'k','fontsize', 14)
+    text( x_range(1) + 0.05 , y_range(2) - 0.05, landscape_str_full,'color', 'k','fontsize', text_fontsize)
     % plot the trajectory of the hip joint
     plot_legend.hip = plot(data_record(4,:),data_record(5,:),...
             'marker','.','MarkerSize',2,'color',[0.4660   0.6740   0.1880]);
         
     legend([plot_legend.landscape,plot_legend.hip,plot_legend.leg_1,plot_legend.leg_2 ],...
     {'Landscape','Hip joint trajectory','Leg_1','Leg_2'},...
-    'FontSize',14);    
+    'FontSize',legend_fontsize, 'location','southeast');    
         
         
 %     figure(2)

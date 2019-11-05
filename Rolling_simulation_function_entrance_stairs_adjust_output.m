@@ -7,7 +7,7 @@
 % Geometry included
 % Dynamic condisered
 %
-% Last advised : 2018/05/17
+% Last advised : 2019/05/17
 %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % opengl info
@@ -30,8 +30,8 @@ leg_mass = 5 ; % define the mass of the structure (kg)
 % leg:0.02211(kg*m^2)
 % motor inertia is small enough to be neglected
 
-mu_s = 0.9; % define the equivalent static friction constant between the wheel and the ground 
-mu_k = 0.8; % define the equivalent dynamic friction constant
+mu_s = 1.0; % define the equivalent static friction constant between the wheel and the ground 
+mu_k = 0.9; % define the equivalent dynamic friction constant
 
 record_data_row_index = 1;
 analysis_data_row_index = 1; % index for recording one point, with varying initial theta
@@ -54,7 +54,7 @@ theta_initial_assigned_deg_array = 0:10:179;  % 18 points
 % theta_initial_assigned_deg_array = 0;
 size_theta_initial_array = size(theta_initial_assigned_deg_array,2);
 
-forward_vel_set = 0.2; % define forward velocity
+forward_vel_set = 0.4; % define forward velocity
 
 % initialize data_record
 record_data = double.empty(0,14);
@@ -62,9 +62,9 @@ record_data = double.empty(0,14);
 %% import xlsx data
 
 input_trajectory_data_filename = 'CPG trajectory';
-trot_xlsx_tab_str = 'Trot, V=200';
+trot_xlsx_tab_str = 'Trot, V=400';
 trot_trajectory_data = xlsread([input_trajectory_data_filename,'.xlsx'],trot_xlsx_tab_str);
-walk_xlsx_tab_str = 'Walk, V=200';
+walk_xlsx_tab_str = 'Walk, V=400';
 walk_trajectory_data = xlsread([input_trajectory_data_filename,'.xlsx'],walk_xlsx_tab_str);
 
 %% Define landscape 
@@ -229,8 +229,8 @@ end % end of varying trajectory mode
 
 if enable.savedata == 1
     data_file_name = ['Fs=',num2str(mu_s),',Fk=',num2str(mu_k),...
-        ',level height[',num2str(level_height_array(1)),'~',num2str(level_height_array(end)),']_inverse.mat'];
-    save_file_path = fullfile(pwd,'Sim result_stairs_V=0.2',data_file_name);
+        ',level height[',num2str(level_height_array(1)),'~',num2str(level_height_array(end)),'].mat'];
+    save_file_path = fullfile(pwd,'Sim result_stairs_V=0.4',data_file_name);
 
     save(save_file_path,'analysis_data');
 end
@@ -240,7 +240,7 @@ end
 set(gcf,'name','Plot sim result','Position', [100 100 1500 800]);
 subplot(2,2,1);
 hold on;
-for mode = 1:5  
+for mode = 1:2  
     selected_data_row_ind = find(analysis_data(:,5) == mode);
     % close all;
     errorbar(analysis_data(selected_data_row_ind,1),analysis_data(selected_data_row_ind,6),analysis_data(selected_data_row_ind,7));  % crossing ratio
@@ -269,7 +269,7 @@ text( xl(1)+(xl(2)-xl(1))*0.01 , yl(2)-(yl(2) - yl(1))*0.05 , def_txt ,'color', 
 
 subplot(2,2,2);
 hold on;
-for mode = 1:5  
+for mode = 1:2  
     selected_data_row_ind = find(analysis_data(:,5) == mode);
     % close all;
     errorbar(analysis_data(selected_data_row_ind,1),analysis_data(selected_data_row_ind,8),analysis_data(selected_data_row_ind,9));  % work
@@ -297,7 +297,7 @@ text( xl(1)+(xl(2)-xl(1))*0.01 , yl(2)-(yl(2) - yl(1))*0.05 , def_txt ,'color', 
 
 subplot(2,2,3);
 hold on;
-for mode = 1:5  
+for mode = 1:2  
     selected_data_row_ind = find(analysis_data(:,5) == mode);
     % close all;
     errorbar(analysis_data(selected_data_row_ind,1),analysis_data(selected_data_row_ind,10),analysis_data(selected_data_row_ind,11));  % work
@@ -323,7 +323,7 @@ ylabel('average Vx  [m/s]');
 
 subplot(2,2,4);
 hold on;
-for mode = 1:5  
+for mode = 1:2 
     selected_data_row_ind = find(analysis_data(:,5) == mode);
     % close all;
     errorbar(analysis_data(selected_data_row_ind,1),analysis_data(selected_data_row_ind,12),analysis_data(selected_data_row_ind,13));  % work
@@ -337,7 +337,7 @@ ylabel('Hip height delta per length [m/m]');
 xl = xlim;
 yl = ylim;
 
-legend('Fixed dr = 0 [m]','Fixed dr = 0.045 [m]','Trot, V=400 [m/s]','Walk, V=400 [m/s]','Inverse, fixed dr = 0.045 [m]');
+legend('Fixed dr = 0 [m]','Fixed dr = 0.045 [m]');
 
 mu_s_txt = ['\mu_s = ',num2str(analysis_data(end,3),'%.1f')] ;
 mu_k_txt = ['\mu_k = ',num2str(analysis_data(end,4),'%.1f')] ;
@@ -354,7 +354,7 @@ if enable.savefig == 1
         ',level height[',num2str(level_height_array(1)),'~',num2str(level_height_array(end)),'].fig'];
 
 %     fig_file_name = 'test.fig';
-    save_fig_path = fullfile(pwd,'Sim result_stairs_V=0.2',fig_file_name);        
+    save_fig_path = fullfile(pwd,'Sim result_stairs_V=0.4',fig_file_name);        
 
     saveas(gca, save_fig_path);
 
