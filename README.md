@@ -1,7 +1,9 @@
 # rotation_simulation
 
-This code is used for simulating rotational status.
+This code is used for the single-leg-wheel rotational dynanic simulation.
 
-Slip conditions are considered.
+Slipping effect and complex contact geometry conditions are considered.
 
-leg-wheel transformable mechanism is used as the model.
+Landscape categories include flat, stairs, sin, and polynominal curves.
+
+Gaits include wheel, CPG trot, CPG walk, leg, and enverse leg.
