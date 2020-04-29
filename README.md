@@ -1,4 +1,4 @@
-# rotation_simulation
+# Rotation_simulation
 
 This code is used for the single-leg-wheel rotational dynanic simulation.
 
