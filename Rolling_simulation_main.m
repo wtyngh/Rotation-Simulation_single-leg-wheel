@@ -40,7 +40,7 @@ mu_k = 0.9; % define the equivalent dynamic friction constant
 mass_force = [0 -(leg_mass*9.8)];
 %% Settings 
 
-enable.video = 0;  % switch to 1 to enable video recording
+enable.video = 1;  % switch to 1 to enable video recording
 
 enable.xls_record = 0;   % switch to 1 to write the data to the excel file
 enable.time_elapsed_print = 1;  % switch to 1 to show the time elapsed of each iteration
@@ -62,7 +62,10 @@ label_fontsize = 12;
 text_fontsize = 13;
 legend_fontsize = 12;
 %% Inital values 
-% 
+
+% Define forward vel
+forward_vel_goal = 0.4; %m/s
+
 hip_joint_initial = [0,0.2];  % initail position of the hip joint
 % hip_joint_initial = [-0.002,0.1169];
 
@@ -82,23 +85,19 @@ theta_initial_assigned_rad = theta_initial_assigned_deg /180*pi;
 
 switch trajectory_mode
     case {1,2} % constant omega, constant dr
-         
-        forward_vel_set = 0.4;
         
         if trajectory_mode == 1  % wheel mode
             delta_r_initial = 0;
             leg_inertia = 0.1118;
-            forward_dis = forward_vel_set / 0.11*(t_end-t_initial);
-            theta_end = theta_initial_assigned_deg/180*pi + forward_dis; %(V/r)*t=w*t
-            input_trajectory_data_filename = ['const w & dr=0, V=',num2str(forward_vel_set)];
+            rotating_sum_theta = forward_vel_goal*(t_end-t_initial) / 0.11; 
+            input_trajectory_data_filename = ['const w & dr=0, V=',num2str(forward_vel_goal)];
         else  % trajectory_mode == 2, legged mode
             delta_r_initial = 0.045;
             leg_inertia = 0.02211;
-            forward_dis = forward_vel_set / 0.155*(t_end-t_initial) * 1.2; % fixing constant
-            theta_end = theta_initial_assigned_deg/180*pi + forward_dis; %(V/r)*t=w*t
-            input_trajectory_data_filename = ['const w & dr=0.045, V=',num2str(forward_vel_set)];
+            rotating_sum_theta = forward_vel_goal*(t_end-t_initial) / 0.155 * 1.068; % fixing ratio         
+            input_trajectory_data_filename = ['const w & dr=0.045, V=',num2str(forward_vel_goal)];
         end
-
+        theta_end = theta_initial_assigned_deg/180*pi + rotating_sum_theta; %(V/r)*t=w*t
         % define the gait table
         theta_array_full_shifted = linspace(theta_initial_assigned_rad, theta_end, num_of_iterations); % constant omega 
         
@@ -112,14 +111,14 @@ switch trajectory_mode
     case {3,4}  % input assigned trajectory, CPG trajectory is used here
         
         % Load trajectory data
-        input_trajectory_data_filename = 'CPG trajectory';
         if trajectory_mode == 3
-            input_xlsx_tab_str = 'Trot, V=0.2';
+            input_xlsx_tab_str = ['Trot, V=', num2str(forward_vel_goal)];
         else  % trajectory_mode == 4
-            input_xlsx_tab_str = 'Walk, V=0.2';     
+            input_xlsx_tab_str = ['Walk, V=', num2str(forward_vel_goal)];     
         end
-
-        input_trajectory_data = xlsread([input_trajectory_data_filename,'.xlsx'],input_xlsx_tab_str);
+        input_trajectory_data_filename = ['CPG ',input_xlsx_tab_str];
+        
+        input_trajectory_data = xlsread(['CPG trajectory','.xlsx'],input_xlsx_tab_str);
         trajectory_t = input_trajectory_data(:,1);
         trajectory_theta = input_trajectory_data(:,2);      
         trajectory_r = input_trajectory_data(:,3);
@@ -188,7 +187,7 @@ switch(landscape_function_index)
         landscape_function = @(x) 0 * x   ;
         landscape_str = 'flat';
     case 3   % Stairs
-        level_height = 0.10;
+        level_height = 0.11;
         landscape_partition = craete_stair_landscape(x_partition, 4, level_height) ;   % 10
         % (x_partition, stair_level, level_height)
         landscape_str = 'stairs';
@@ -203,7 +202,7 @@ if landscape_function_index ~= 3
     landscape_str_full = [landscape_str,' ',str_landscape_function(5:end)];
     landscape_partition = landscape_function(x_partition);
 else
-    landscape_str_full = [landscape_str,', level height = ',num2str(level_height),' [m]'];
+    landscape_str_full = ['stairs, L_h = ',num2str(level_height),' (m)'];
     landscape_function = @(x) interp1(x_partition, landscape_partition, x,'linear','extrap');
 end
 landscape_partition_diff = [diff(landscape_partition),0];
@@ -297,7 +296,6 @@ if enable.video == 1
                       ', mu_k=',num2str(mu_k),...
                       ', ',landscape_str,...
                       ', ',input_trajectory_data_filename,...
-                      ', ',input_xlsx_tab_str,...
                       ', rate=',num2str(video_play_frame_rate),...
                       '.avi'];
     writerObj = VideoWriter(video_filename);
@@ -542,7 +540,7 @@ for loop_iteration = 1:num_of_iterations
                     ' , \mu_k = ', sprintf('%.1f',mu_k),...
                     ' , ', landscape_str ,...
                     ', ',input_trajectory_data_filename,...
-                    ', ',input_xlsx_tab_str ];
+                    ];
 
         title(title_str, 'fontsize',title_fontsize);
         xlabel('x [m]','FontSize',label_fontsize);
